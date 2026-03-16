@@ -2331,8 +2331,8 @@ function _saveApiKey(){
   var key = (document.getElementById('_apiKeyInput')||{}).value||'';
   var msgEl = document.getElementById('_apiKeyMsg');
   key = key.trim();
-  if(!key.startsWith('sk-ant-')){
-    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Key "sk-ant-" se shuru hona chahiye!';}
+  if(!key.startsWith('sk-ant-') && !key.startsWith('gsk_')){
+    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Key "sk-ant-" ya "gsk_" se shuru honi chahiye!';}
     return;
   }
   setApiKey(key);
