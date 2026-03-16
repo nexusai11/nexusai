@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<style>html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}</style>
 <meta name="theme-color" content="#04050d"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -27,7 +29,7 @@
   --tx:#eeeeff;--m1:#555878;--m2:#8b8daa;
   --a:#6c63ff;--b:#00d4ff;--c:#ff6b9d;--d:#00ffb3;
 }
-html,body{height:100%;overflow-x:hidden;overscroll-behavior:none;overscroll-behavior-y:none}
+html,body{height:100%;overflow-x:hidden;overscroll-behavior:none;overscroll-behavior-y:none;touch-action:pan-x pan-y}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;cursor:none;overscroll-behavior:none}
 
 /* SPLASH SCREEN */
@@ -1197,6 +1199,35 @@ img,video{max-width:100%;height:auto}
 // Created by Faisal Saifi
 // ============================================
 
+// ===== BLOCK PULL TO REFRESH =====
+(function(){
+  var lastY = 0;
+  document.addEventListener('touchstart', function(e){ lastY = e.touches[0].clientY; }, {passive:true});
+  document.addEventListener('touchmove', function(e){
+    var y = e.touches[0].clientY;
+    var el = e.target;
+    // Find scrollable parent
+    while(el && el !== document.body){
+      if(el.scrollHeight > el.clientHeight && 
+         (el.style.overflowY === 'auto' || el.style.overflowY === 'scroll' || 
+          window.getComputedStyle(el).overflowY === 'auto' || 
+          window.getComputedStyle(el).overflowY === 'scroll')){
+        // Allow scroll inside scrollable elements
+        return;
+      }
+      el = el.parentElement;
+    }
+    // Block pull-to-refresh on body
+    if(y > lastY && window.scrollY === 0){
+      e.preventDefault();
+    }
+  }, {passive:false});
+  
+  // Also prevent Chrome's pull-to-refresh via CSS
+  document.documentElement.style.overscrollBehavior = 'none';
+  document.body.style.overscrollBehavior = 'none';
+})();
+
 // ===== SPLASH SCREEN =====
 window.addEventListener('load', function(){
   setTimeout(function(){
@@ -1243,9 +1274,9 @@ const ADMIN_PASS='FaisalAdmin2024';
 const VER='v5.0';
 
 // ===== API KEY SETUP =====
-var GROQ_KEY='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';
-var GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
-var GROQ_MODEL='llama-3.3-70b-versatile';
+var OR_KEY='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';
+var OR_URL='https://openrouter.ai/api/v1/chat/completions';
+var OR_MODEL='meta-llama/llama-3.3-70b-instruct:free';
 
 function getApiKey(){
   return localStorage.getItem('nxak')||'';
@@ -1253,11 +1284,16 @@ function getApiKey(){
 function setApiKey(key){
   if(key)localStorage.setItem('nxak',key);
 }
+function isORKey(k){ return k && k.startsWith('sk-or-'); }
 function isGroqKey(k){ return k && k.startsWith('gsk_'); }
 function apiHeaders(){
-  var key=getApiKey()||GROQ_KEY;
+  var key=getApiKey()||OR_KEY;
   var h={'Content-Type':'application/json'};
-  if(isGroqKey(key)){
+  if(isORKey(key)){
+    h['Authorization']='Bearer '+key;
+    h['HTTP-Referer']='https://nexusai11.github.io';
+    h['X-Title']='NexusAI';
+  } else if(isGroqKey(key)){
     h['Authorization']='Bearer '+key;
   } else {
     h['anthropic-dangerous-direct-browser-access']='true';
@@ -1268,9 +1304,20 @@ function apiHeaders(){
 function checkApiKey(){ return true; }
 
 async function callAI(messages, system, maxTokens, tools){
-  var key=getApiKey()||GROQ_KEY;
+  var key=getApiKey()||OR_KEY;
   maxTokens=maxTokens||2000;
-  if(!isGroqKey(key)){
+  
+  // OpenRouter or Groq (OpenAI-compatible)
+  if(isORKey(key)||isGroqKey(key)){
+    var url=isORKey(key)?OR_URL:'https://api.groq.com/openai/v1/chat/completions';
+    var model=isORKey(key)?OR_MODEL:'llama-3.3-70b-versatile';
+    var msgs=[{role:'system',content:system||'You are NexusAI, World\'s #1 AI Platform by Faisal Saifi.'}].concat(messages);
+    var r=await fetch(url,{method:'POST',headers:apiHeaders(),body:JSON.stringify({model:model,messages:msgs,max_tokens:maxTokens,temperature:0.7})});
+    var d=await r.json();
+    if(d.choices&&d.choices[0])return d.choices[0].message.content||'';
+    if(d.error)return '⚠️ '+d.error.message;
+    return 'Something went wrong. Please try again.';
+  } else {
     // Anthropic
     var body={model:curModel,max_tokens:maxTokens,system:system,messages:messages};
     if(tools)body.tools=tools;
@@ -1279,22 +1326,14 @@ async function callAI(messages, system, maxTokens, tools){
     var txt='';
     if(d.content&&Array.isArray(d.content))d.content.forEach(function(b){if(b.type==='text')txt+=b.text});
     if(!txt&&d.error)txt='⚠️ '+d.error.message;
-    return txt||'Kuch galat ho gaya.';
-  } else {
-    // Groq - free!
-    var msgs=[{role:'system',content:system||'You are NexusAI, World\'s #1 AI Platform by Faisal Saifi.'}].concat(messages);
-    var r=await fetch(GROQ_URL,{method:'POST',headers:apiHeaders(),body:JSON.stringify({model:GROQ_MODEL,messages:msgs,max_tokens:maxTokens,temperature:0.7})});
-    var d=await r.json();
-    if(d.choices&&d.choices[0])return d.choices[0].message.content||'';
-    if(d.error)return '⚠️ '+d.error.message;
-    return 'Kuch galat ho gaya.';
+    return txt||'Something went wrong.';
   }
 }
 
 // ===== STATE =====
 var user=null,chatMsgs=[],chatHist=[],srchHist=[],curModel='claude-sonnet-4-20250514',actCat='all',busy=false,isAdmin=false;
 var synth=null,vGender='male',listening=false,micRec=null,chatMicRec=null;try{synth=window.speechSynthesis;}catch(e){}
-var imgB64=null,selStyle='Realistic';
+var imgB64=null,selStyle2='Realistic';
 
 const MODELS=[
   {id:'claude-sonnet-4-20250514',l:'Claude Sonnet',s:'Fast ⚡'},
@@ -2072,11 +2111,16 @@ async function procVoice(text){
   var vs=document.getElementById('vstat'),vr=document.getElementById('vresp');
   if(vs)vs.textContent='Thinking...';if(vr)vr.style.display='none';
   try{
-    var reply = await callAI([{role:'user',content:text}], 'You are NexusAI Voice Assistant by Faisal Saifi, India. Reply in EXACTLY the same language as the user. Keep reply SHORT — 2-3 sentences only for voice. No markdown, natural speech only.', 300);
+    var reply = await callAI(
+      [{role:'user',content:text}],
+      'You are NexusAI Voice Assistant by Faisal Saifi, India. Reply in EXACTLY the same language as the user. Keep reply SHORT — 2-3 sentences only for voice. No markdown, natural speech only.',
+      300
+    );
+    if(!reply)reply='Sorry, could not process. Please try again.';
     if(vr){vr.style.display='block';vr.innerHTML='<strong>NexusAI:</strong> '+reply.replace(/\n/g,'<br>')}
     if(vs)vs.textContent='Speaking...';
     speakText(reply,function(){if(vs)vs.textContent='Tap mic to ask another question'});
-  }catch(e){if(vs)vs.textContent='Error. Please try again.'}
+  }catch(e){if(vs)vs.textContent='Error. Please try again.';}
 }
 function vquick(text){
   var vt=document.getElementById('vtxt');if(vt){vt.style.display='block';vt.textContent='You: '+text.replace(/"/g,'')}
@@ -2384,11 +2428,10 @@ function _clearApiKey(){
 
 
 // ===== SUBSCRIPTION SYSTEM =====
-var CF_APP_ID = '123071401aff55542c6c26f2c834170321';
-var CF_SECRET = 'cfsk_ma_prod_676723c370a417beec0044f2f18dc547_c1cb10fb';
 var isPremium = false;
-var FREE_CHAT_LIMIT = 15; // 15 free chats per day
+var FREE_CHAT_LIMIT = 15;
 var todayChatCount = 0;
+var UPI_ID = 'saififaisal9027@okicici'; // Your UPI ID
 
 function checkPremium(){
   var sub = JSON.parse(localStorage.getItem('nxsub')||'{}');
@@ -2397,7 +2440,6 @@ function checkPremium(){
     updatePremiumUI();
     return;
   }
-  // Check if admin gifted premium
   checkGiftedPremium();
 }
 
@@ -2437,7 +2479,7 @@ function showLimitWarning(){
   var warn = document.createElement('div');
   warn.id = 'limitWarn';
   warn.className = 'limit-warn';
-  warn.innerHTML = '<div class="limit-warn-txt">⚡ Free limit reached (10/10 chats today). Upgrade for unlimited access!</div><button class="limit-warn-btn" onclick="openSubOverlay()">Upgrade ₹9 →</button>';
+  warn.innerHTML = '<div class="limit-warn-txt">⚡ Daily free limit reached (15/15). Upgrade for unlimited access!</div><button class="limit-warn-btn" onclick="openSubOverlay()">Upgrade ₹9 →</button>';
   msgs.appendChild(warn);
 }
 
@@ -2451,147 +2493,99 @@ function closeSubOverlay(){
   document.body.style.overflow='';
 }
 
-async function startPayment(plan){
+function startPayment(plan){
   if(!user){ toast('Please login first!'); closeSubOverlay(); return; }
-  closeSubOverlay();
-
+  
   var amount = plan === 'first' ? 9 : 200;
-  var orderId = 'NX_' + Date.now() + '_' + Math.random().toString(36).substr(2,6).toUpperCase();
-  var custId = user.e.replace(/[^a-zA-Z0-9]/g,'_').substring(0,50);
+  var note = plan === 'first' ? 'NexusAI Premium 1st Month' : 'NexusAI Premium Monthly';
+  
+  // Show payment instructions
+  closeSubOverlay();
+  
+  var overlay = document.createElement('div');
+  overlay.id = 'payOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(10px)';
+  overlay.innerHTML = `
+    <div style="background:#0d1025;border:1px solid rgba(108,99,255,.3);border-radius:20px;padding:1.8rem;width:100%;max-width:360px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">💳</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#fbbf24;margin-bottom:.3rem">Pay ₹${amount}</div>
+      <div style="font-size:.75rem;color:var(--m2);margin-bottom:1.2rem">${note}</div>
+      
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:1rem;margin-bottom:1rem">
+        <div style="font-size:.65rem;color:var(--m2);text-transform:uppercase;letter-spacing:1px;margin-bottom:.4rem">UPI ID</div>
+        <div style="font-size:1rem;font-weight:700;color:#fff;letter-spacing:.5px">${UPI_ID}</div>
+      </div>
+      
+      <a href="upi://pay?pa=${UPI_ID}&pn=NexusAI&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}" 
+         style="display:block;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:12px;padding:.9rem;color:#000;font-weight:800;font-size:.95rem;text-decoration:none;margin-bottom:.7rem"
+         onclick="handleUPIClick('${plan}')">
+        💰 Pay with UPI App
+      </a>
+      
+      <div style="font-size:.7rem;color:var(--m2);margin-bottom:1rem">Opens GPay, PhonePe, Paytm automatically</div>
+      
+      <div style="font-size:.72rem;color:rgba(255,255,255,.4);margin-bottom:.8rem">After payment, enter Transaction ID:</div>
+      <input type="text" id="txnInput" placeholder="Transaction ID (e.g. 123456789)" 
+             style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.65rem .9rem;color:#fff;font-size:.82rem;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:.6rem;text-align:center"/>
+      <button onclick="verifyPayment('${plan}')" 
+              style="width:100%;background:linear-gradient(135deg,#6c63ff,#00d4ff);border:none;border-radius:10px;padding:.75rem;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer;margin-bottom:.5rem">
+        ✅ I've Paid — Activate Premium
+      </button>
+      <button onclick="document.getElementById('payOverlay').remove()" 
+              style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.65rem;color:var(--m2);font-size:.82rem;cursor:pointer">
+        Cancel
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
 
-  toast('🔄 Setting up payment...');
+function handleUPIClick(plan){
+  setTimeout(function(){
+    toast('After payment, enter your Transaction ID!');
+  }, 2000);
+}
 
-  try{
-    // STEP 1: Create Cashfree Order with Auto-pay (UPI Mandate / Card recurring)
-    var res = await fetch('https://api.cashfree.com/pg/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-version': '2023-08-01',
-        'x-client-id': CF_APP_ID,
-        'x-client-secret': CF_SECRET
-      },
-      body: JSON.stringify({
-        order_id: orderId,
-        order_amount: amount,
-        order_currency: 'INR',
-        order_note: plan === 'first' ? 'NexusAI First Month ₹9 then ₹200/month' : 'NexusAI Premium ₹200/month',
-        customer_details: {
-          customer_id: custId,
-          customer_email: user.e,
-          customer_phone: '9999999999',
-          customer_name: user.n || 'NexusAI User'
-        },
-        order_meta: {
-          return_url: window.location.href.split('?')[0] + '?order_id={order_id}&plan=' + plan + '&status={order_status}',
-          notify_url: 'https://mynexusai.netlify.app'
-        },
-        order_tags: {
-          plan: plan,
-          user_email: user.e,
-          auto_pay: 'true'
-        }
-      })
-    });
-
-    var data = await res.json();
-
-    if(data.payment_session_id){
-      // STEP 2: Open Cashfree checkout with auto-pay enabled
-      var cashfree;
-      try{ cashfree = Cashfree({ mode: 'production' }); }
-      catch(e){ toast('Payment SDK loading...'); return; }
-
-      cashfree.checkout({
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: '_modal',
-        appearance: {
-          theme: 'dark',
-          labels: 'floating'
-        }
-      }).then(function(result){
-        if(result.error){
-          toast('❌ Payment failed: ' + (result.error.message || 'Try again'));
-        } else if(result.paymentDetails){
-          activatePremium(plan, orderId);
-          // Save subscription info for auto-pay tracking
-          saveSubInfo(plan, orderId, amount);
-        }
-      }).catch(function(e){
-        toast('Payment cancelled.');
-      });
-
-    } else {
-      // Fallback: Direct payment link
-      var fallbackMsg = data.message || 'Payment setup failed';
-      toast('⚠️ ' + fallbackMsg);
-      console.error('Cashfree order error:', data);
-    }
-
-  } catch(e){
-    toast('⚠️ Network error. Check internet & try again.');
-    console.error('Payment error:', e);
+function verifyPayment(plan){
+  var txn = (document.getElementById('txnInput')||{}).value||'';
+  if(!txn || txn.length < 6){
+    toast('⚠️ Please enter valid Transaction ID!');
+    return;
   }
+  // Save for admin verification
+  var pending = JSON.parse(localStorage.getItem('nxpending')||'[]');
+  pending.push({email:user.e, name:user.n, plan:plan, txn:txn, time:Date.now()});
+  localStorage.setItem('nxpending', JSON.stringify(pending));
+  
+  // Activate premium (admin can revoke if txn is fake)
+  activatePremium(plan, txn);
+  document.getElementById('payOverlay').remove();
+  toast('🎉 Premium activated! Welcome to NexusAI Premium!');
 }
 
 function saveSubInfo(plan, orderId, amount){
-  var subInfo = {
-    plan: plan,
-    orderId: orderId,
-    amount: amount,
-    startDate: Date.now(),
-    nextBilling: Date.now() + (30 * 24 * 60 * 60 * 1000),
-    autoPayEnabled: true,
-    userEmail: user ? user.e : ''
-  };
+  var subInfo = {plan:plan, orderId:orderId, amount:amount, startDate:Date.now(), userEmail:user?user.e:''};
   localStorage.setItem('nxsubinfo', JSON.stringify(subInfo));
 }
 
 function checkAutoPayRenewal(){
   if(!isPremium) return;
-  var sub = JSON.parse(localStorage.getItem('nxsub') || '{}');
-  var subInfo = JSON.parse(localStorage.getItem('nxsubinfo') || '{}');
+  var sub = JSON.parse(localStorage.getItem('nxsub')||'{}');
   if(!sub.expiry) return;
-  
-  var daysLeft = Math.floor((sub.expiry - Date.now()) / (1000 * 60 * 60 * 24));
-  
-  // Show renewal reminder 3 days before
+  var daysLeft = Math.floor((sub.expiry - Date.now()) / (1000*60*60*24));
   if(daysLeft <= 3 && daysLeft > 0){
-    setTimeout(function(){
-      toast('⚡ Premium expires in ' + daysLeft + ' day(s). Auto-pay will renew at ₹200!');
-    }, 2000);
-  }
-  
-  // If expired but had auto-pay
-  if(sub.expiry < Date.now() && subInfo.autoPayEnabled){
-    isPremium = false;
-    updatePremiumUI();
-    setTimeout(function(){
-      toast('Premium expired. Auto-renewing...');
-      startPayment('monthly');
-    }, 1500);
+    setTimeout(function(){ toast('⚡ Premium expires in '+daysLeft+' day(s). Please renew!'); }, 2000);
   }
 }
 
 function activatePremium(plan, paymentId){
-  var expiry;
-  if(plan === 'first' || plan === 'monthly'){
-    expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
-  }
+  var expiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
   var sub = { active:true, plan:plan, expiry:expiry, paymentId:paymentId, activated:Date.now() };
   localStorage.setItem('nxsub', JSON.stringify(sub));
   isPremium = true;
   updatePremiumUI();
-  // Remove limit warning if shown
   var lw = document.getElementById('limitWarn');
   if(lw) lw.remove();
   toast('🎉 Premium activated! Enjoy unlimited NexusAI!');
-  // If first month, set auto-renewal reminder
-  if(plan === 'first'){
-    setTimeout(function(){
-      toast('Auto-renew: ₹200/month from next month');
-    }, 3000);
-  }
 }
 
 
