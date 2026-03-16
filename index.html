@@ -1209,25 +1209,52 @@ const ADMIN_PASS='FaisalAdmin2024';
 const VER='v5.0';
 
 // ===== API KEY SETUP =====
-// Admin sets this via Secret Admin Panel (Logo x5 tap → Faisal@786)
+var GROQ_KEY='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';
+var GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
+var GROQ_MODEL='llama-3.3-70b-versatile';
+
 function getApiKey(){
   return localStorage.getItem('nxak')||'';
 }
 function setApiKey(key){
   if(key)localStorage.setItem('nxak',key);
 }
+function isGroqKey(k){ return k && k.startsWith('gsk_'); }
 function apiHeaders(){
-  var key=getApiKey();
-  var h={'Content-Type':'application/json','anthropic-dangerous-direct-browser-access':'true'};
-  if(key)h['x-api-key']=key;
+  var key=getApiKey()||GROQ_KEY;
+  var h={'Content-Type':'application/json'};
+  if(isGroqKey(key)){
+    h['Authorization']='Bearer '+key;
+  } else {
+    h['anthropic-dangerous-direct-browser-access']='true';
+    if(key)h['x-api-key']=key;
+  }
   return h;
 }
-function checkApiKey(){
-  if(!getApiKey()){
-    toast('⚠️ API Key set nahi hai! Admin panel mein set karo.');
-    return false;
+function checkApiKey(){ return true; }
+
+async function callAI(messages, system, maxTokens, tools){
+  var key=getApiKey()||GROQ_KEY;
+  maxTokens=maxTokens||2000;
+  if(!isGroqKey(key)){
+    // Anthropic
+    var body={model:curModel,max_tokens:maxTokens,system:system,messages:messages};
+    if(tools)body.tools=tools;
+    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:apiHeaders(),body:JSON.stringify(body)});
+    var d=await r.json();
+    var txt='';
+    if(d.content&&Array.isArray(d.content))d.content.forEach(function(b){if(b.type==='text')txt+=b.text});
+    if(!txt&&d.error)txt='⚠️ '+d.error.message;
+    return txt||'Kuch galat ho gaya.';
+  } else {
+    // Groq - free!
+    var msgs=[{role:'system',content:system||'You are NexusAI, World\'s #1 AI Platform by Faisal Saifi.'}].concat(messages);
+    var r=await fetch(GROQ_URL,{method:'POST',headers:apiHeaders(),body:JSON.stringify({model:GROQ_MODEL,messages:msgs,max_tokens:maxTokens,temperature:0.7})});
+    var d=await r.json();
+    if(d.choices&&d.choices[0])return d.choices[0].message.content||'';
+    if(d.error)return '⚠️ '+d.error.message;
+    return 'Kuch galat ho gaya.';
   }
-  return true;
 }
 
 // ===== STATE =====
@@ -1760,78 +1787,30 @@ async function send(txt){
   chatMsgs.push({role:'user',content:msg});
   showTyping();
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:apiHeaders(),
-      body:JSON.stringify({
-        model:curModel,max_tokens:2000,
-        system:`You are NexusAI — Earth's most advanced AI platform, created by Faisal Saifi, India. You are the combined intelligence of 200+ world-class AI systems.
+    var systemPrompt=`You are NexusAI — Earth's most advanced AI platform, created by Faisal Saifi, India. You are the combined intelligence of 200+ world-class AI systems.
 
 ═══ LANGUAGE MASTERY ═══
 Detect and reply in the EXACT language the user writes — perfectly, naturally, fluently:
 • Hindi (हिंदी) • English • Hinglish (Hindi+English mix) • Urdu (اردو) • Arabic (العربية) • Bengali (বাংলা) • Tamil (தமிழ்) • Telugu (తెలుగు) • Marathi (मराठी) • Gujarati (ગુજરાતી) • Punjabi (ਪੰਜਾਬੀ) • Spanish • French • German • Chinese • Japanese • Korean • Russian • Portuguese • Turkish • and ALL other world languages.
 NEVER switch language mid-conversation. Match tone: formal if they're formal, casual if they're casual.
 
-═══ COMBINED AI INTELLIGENCE ═══
-You think like ALL these AIs combined:
-🧠 ChatGPT-4o: Conversation, general knowledge, coding
-🎯 Claude 3.5: Deep reasoning, analysis, long-form writing  
-🔍 Perplexity: Real-time web search, fact-checking
-♊ Gemini Ultra: Multimodal, science, math
-🌊 DeepSeek R1: Deep thinking, complex problems
-𝕏 Grok: Wit, humor, current events, X/Twitter trends
-⚡ Groq: Ultra-fast responses
-🦙 Llama 3: Open reasoning
-🌪️ Mistral: European knowledge, multilingual
-🤝 Cohere: Business intelligence, summarization
-
-═══ CAPABILITIES ═══
-💬 CONVERSATION: Expert chat in any topic, any depth, any language
-🌐 REAL-TIME: Live news, weather, prices, sports, stocks, crypto
-💻 CODING: Write, debug, explain code in Python, JS, Java, C++, 50+ languages
-📊 ANALYSIS: Data, math, science, research papers, statistics
-✍️ WRITING: Essays, emails, stories, poetry, scripts, ads, SEO content
-🎨 CREATIVE: Art ideas, design concepts, music lyrics, jokes, riddles
-🏥 HEALTH: Medical info, symptoms, wellness tips (not replacement for doctor)
-⚖️ LEGAL: Basic legal guidance (not replacement for lawyer)
-💰 FINANCE: Investment basics, budgeting, crypto, stocks info
-🇮🇳 INDIA EXPERT: Deep knowledge of every Indian state, city, culture, history, politics, festivals, food, language
-🌍 WORLD KNOWLEDGE: Every country, culture, history, geography
-🍳 RECIPES: Any cuisine, any diet, step-by-step cooking
-💪 FITNESS: Workout plans, nutrition, yoga, meditation
-🧒 EDUCATION: Explain anything simply — for students of all ages
-😄 ENTERTAINMENT: Jokes, riddles, games, fun facts, trivia
-
-═══ RESPONSE STYLE ═══
-• Match the user's energy — casual with casual, professional with professional
-• Use emojis naturally and appropriately
-• Format responses clearly: use bold **text**, bullet points, numbered lists when helpful
-• Give SPECIFIC, ACCURATE, DETAILED answers — never vague
-• For Indian cities/places: always mention exact district, state, country
-• For sensitive topics: be helpful but responsible
-• SHORT answers for simple questions, DETAILED for complex ones
-
 ═══ IDENTITY ═══
 You are NexusAI — NOT Claude, NOT ChatGPT, NOT Gemini.
 Creator: Faisal Saifi, India 🇮🇳
 If asked who made you: "I was created by Faisal Saifi from India! 🙌 I am NexusAI — the combined power of 200+ AI tools in one platform."
-If asked your capabilities: List everything above with enthusiasm.
 
-═══ WEB SEARCH ═══
-ALWAYS use web search for: breaking news, today's weather, live sports scores, current prices, recent events (anything after 2024), stock/crypto prices, trending topics.`,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:chatMsgs.slice(-10)
-      })
-    });
-    var data=await res.json();
-    var reply='',srch=false;
-    if(data.content&&Array.isArray(data.content))data.content.forEach(function(b){if(b.type==='text')reply+=b.text;if(b.type==='tool_use')srch=true});
-    if(!reply && data.error){reply='⚠️ API Error: '+data.error.message;}
-    if(!reply)reply='Kuch galat ho gaya. Please try again.';
+═══ RESPONSE STYLE ═══
+• Match the user's energy — casual with casual, professional with professional
+• Use emojis naturally and appropriately
+• Format responses clearly: use bold **text**, bullet points when helpful
+• Give SPECIFIC, ACCURATE, DETAILED answers — never vague
+• SHORT answers for simple questions, DETAILED for complex ones`;
+
+    var reply = await callAI(chatMsgs.slice(-10), systemPrompt, 2000);
     var ms=Math.round(performance.now()-t0);
     document.getElementById('trow')&&document.getElementById('trow').remove();
     var ml=MODELS.find(function(m){return m.id===curModel});
-    appendMsg(reply,'ai',(ml?ml.l:'NexusAI')+' · '+gt()+' · '+ms+'ms'+(srch?' · 🌐':''));
+    appendMsg(reply,'ai',(ml?ml.l:'NexusAI')+' · '+gt()+' · '+ms+'ms');
     chatMsgs.push({role:'assistant',content:reply});
     saveSrch(msg,'chat',msg,reply.substring(0,120));
     updSbHist(msg);
@@ -2059,10 +2038,7 @@ async function procVoice(text){
   var vs=document.getElementById('vstat'),vr=document.getElementById('vresp');
   if(vs)vs.textContent='Thinking...';if(vr)vr.style.display='none';
   try{
-    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:apiHeaders(),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:300,system:'You are NexusAI Voice Assistant by Faisal Saifi, India. Reply in EXACTLY the same language as the user. Keep reply SHORT — 2-3 sentences only for voice. No markdown, natural speech only.',tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:text}]})});
-    var data=await r.json();var reply='';
-    if(data.content&&Array.isArray(data.content))data.content.forEach(function(b){if(b.type==='text')reply+=b.text});
-    if(!reply)reply='Sorry, could not process. Please try again.';
+    var reply = await callAI([{role:'user',content:text}], 'You are NexusAI Voice Assistant by Faisal Saifi, India. Reply in EXACTLY the same language as the user. Keep reply SHORT — 2-3 sentences only for voice. No markdown, natural speech only.', 300);
     if(vr){vr.style.display='block';vr.innerHTML='<strong>NexusAI:</strong> '+reply.replace(/\n/g,'<br>')}
     if(vs)vs.textContent='Speaking...';
     speakText(reply,function(){if(vs)vs.textContent='Tap mic to ask another question'});
