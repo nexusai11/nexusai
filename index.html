@@ -2326,7 +2326,7 @@ function _openSecretAdmin(){
       <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--m1);margin-bottom:.65rem">🔑 Anthropic API Key</div>
       <div style="background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.25);border-radius:14px;padding:1.1rem;margin-bottom:1.5rem">
         <div style="font-size:.78rem;color:#9d97ff;font-weight:700;margin-bottom:.3rem">Current Key Status: <span style="color:${currentKey?'#00ffb3':'#ff8a8a'}">${currentKey?'✅ Set ('+maskedKey+')':'❌ Not Set'}</span></div>
-        <div style="font-size:.7rem;color:var(--m2);margin-bottom:.8rem">Anthropic Console se API key lo → https://console.anthropic.com</div>
+        <div style="font-size:.7rem;color:var(--m2);margin-bottom:.8rem">Get API key from OpenRouter → https://openrouter.ai/settings/keys</div>
         <div style="display:flex;flex-direction:column;gap:.6rem">
           <input type="password" id="_apiKeyInput" placeholder="sk-ant-api03-..." style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.65rem .9rem;color:#fff;font-size:.82rem;font-family:'DM Sans',sans-serif;outline:none"/>
           <div style="display:flex;gap:.5rem">
@@ -2409,8 +2409,8 @@ function _saveApiKey(){
   var key = (document.getElementById('_apiKeyInput')||{}).value||'';
   var msgEl = document.getElementById('_apiKeyMsg');
   key = key.trim();
-  if(!key.startsWith('sk-ant-') && !key.startsWith('gsk_')){
-    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Key must start with "sk-ant-" or "gsk_"!';}
+  if(!key.startsWith('sk-ant-') && !key.startsWith('gsk_') && !key.startsWith('sk-or-')){
+    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Invalid key format!';}
     return;
   }
   setApiKey(key);
