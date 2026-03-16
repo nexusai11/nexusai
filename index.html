@@ -27,8 +27,22 @@
   --tx:#eeeeff;--m1:#555878;--m2:#8b8daa;
   --a:#6c63ff;--b:#00d4ff;--c:#ff6b9d;--d:#00ffb3;
 }
-html,body{height:100%;overflow-x:hidden}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;cursor:none}
+html,body{height:100%;overflow-x:hidden;overscroll-behavior:none;overscroll-behavior-y:none}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;cursor:none;overscroll-behavior:none}
+
+/* SPLASH SCREEN */
+#splash{position:fixed;inset:0;z-index:99999;background:#04050d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;transition:opacity .5s ease}
+#splash.hide{opacity:0;pointer-events:none}
+.splash-logo{width:90px;height:90px;border-radius:24px;background:linear-gradient(135deg,#6c63ff,#00d4ff);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:800;color:#fff;box-shadow:0 0 60px rgba(108,99,255,.5),0 0 120px rgba(0,212,255,.2);animation:splashPulse 1.5s ease-in-out infinite}
+.splash-name{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;letter-spacing:-1px}
+.splash-name span{background:linear-gradient(90deg,#6c63ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.splash-sub{font-size:.78rem;color:rgba(255,255,255,.35);letter-spacing:2px;text-transform:uppercase}
+.splash-dots{display:flex;gap:.4rem;margin-top:.5rem}
+.splash-dot{width:6px;height:6px;border-radius:50%;background:var(--a);animation:splashDot 1.2s ease-in-out infinite}
+.splash-dot:nth-child(2){animation-delay:.2s;background:#00d4ff}
+.splash-dot:nth-child(3){animation-delay:.4s;background:#ff6b9d}
+@keyframes splashPulse{0%,100%{box-shadow:0 0 60px rgba(108,99,255,.5),0 0 120px rgba(0,212,255,.2)}50%{box-shadow:0 0 80px rgba(108,99,255,.8),0 0 160px rgba(0,212,255,.4)}}
+@keyframes splashDot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-6px);opacity:1}}
 #cur{position:fixed;width:10px;height:10px;border-radius:50%;background:var(--a);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s;will-change:left,top}
 #curR{position:fixed;width:30px;height:30px;border-radius:50%;border:1px solid rgba(108,99,255,.4);pointer-events:none;z-index:9998;transform:translate(-50%,-50%);will-change:left,top}
 canvas#bg{position:fixed;inset:0;z-index:0;opacity:.4;pointer-events:none}
@@ -237,7 +251,7 @@ canvas#bg{position:fixed;inset:0;z-index:0;opacity:.4;pointer-events:none}
 .sdot{width:7px;height:7px;border-radius:50%;background:#00e5a0;box-shadow:0 0 6px #00e5a0;animation:sdg 2s infinite}
 @keyframes sdg{0%,100%{opacity:1}50%{opacity:.35}}
 /* Messages scroll area */
-.cmsgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:1.5rem 0;display:flex;flex-direction:column;gap:0;scroll-behavior:smooth}
+.cmsgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:1.5rem 0;display:flex;flex-direction:column;gap:0;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .cmsgs::-webkit-scrollbar{width:4px}
 .cmsgs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:4px}
 /* Welcome screen */
@@ -552,6 +566,18 @@ img,video{max-width:100%;height:auto}
 <canvas id="bg"></canvas>
 <div id="cur"></div>
 <div id="curR"></div>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <div class="splash-logo">N</div>
+  <div class="splash-name"><span>Nexus</span>AI</div>
+  <div class="splash-sub">World's #1 AI Platform</div>
+  <div class="splash-dots">
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+  </div>
+</div>
 
 <!-- AUTH — Premium Redesign -->
 <div id="auth">
@@ -1171,6 +1197,14 @@ img,video{max-width:100%;height:auto}
 // Created by Faisal Saifi
 // ============================================
 
+// ===== SPLASH SCREEN =====
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    var splash = document.getElementById('splash');
+    if(splash){ splash.classList.add('hide'); setTimeout(function(){ splash.style.display='none'; }, 500); }
+  }, 2000);
+});
+
 // ===== CRITICAL: These run immediately =====
 function toast(msg,dur){
   try{
@@ -1429,12 +1463,12 @@ function doLogin(){
   var errEl=document.getElementById('lerr');
   errEl.style.display='none';
 
-  if(!e&&!p){showErr('lerr','⚠️ Email aur password daalo');return}
-  if(!e){showErr('lerr','⚠️ Email address daalo');return}
-  if(!p){showErr('lerr','⚠️ Password daalo');return}
-  if(!e.includes('@')||!e.includes('.')){showErr('lerr','⚠️ Valid email daalo (e.g. you@gmail.com)');return}
+  if(!e&&!p){showErr('lerr','⚠️ Please enter email and password');return}
+  if(!e){showErr('lerr','⚠️ Please enter your email');return}
+  if(!p){showErr('lerr','⚠️ Please enter your password');return}
+  if(!e.includes('@')||!e.includes('.')){showErr('lerr','⚠️ Please enter a valid email');return}
 
-  setLoading('lbtn', true, 'Logging in...');
+  setLoading('lbtn', true, 'Signing in...');
   
   hashPassword(p).then(function(hashedP){
     var users=JSON.parse(localStorage.getItem('nxu')||'[]');
@@ -1450,7 +1484,7 @@ function doLogin(){
       if(emailExists){
         showErr('lerr','❌ Wrong password. Please try again.');
       } else {
-        showErr('lerr','❌ Account nahi mila. Pehle Sign Up karo.');
+        showErr('lerr','❌ Account not found. Please Sign Up first.');
         setTimeout(function(){
           var lastTab=document.querySelector('.atab:last-child');
           if(lastTab){lastTab.style.background='rgba(108,99,255,.2)';setTimeout(function(){lastTab.style.background=''},1500);}
@@ -1819,9 +1853,9 @@ If asked who made you: "I was created by Faisal Saifi from India! 🙌 I am Nexu
     document.getElementById('trow')&&document.getElementById('trow').remove();
     var errMsg = e.message || 'Unknown error';
     if(errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')){
-      appendMsg('⚠️ Internet connection weak hai. Please check your internet aur dobara try karein.','ai');
+      appendMsg('⚠️ Weak internet connection. Please check and try again.','ai');
     } else {
-      appendMsg('⚠️ Kuch problem aayi. Dobara try karein.','ai');
+      appendMsg('⚠️ Something went wrong. Please try again.','ai');
     }
     console.error('Chat error:',e);
   }
@@ -2177,7 +2211,7 @@ function _openSecretAdmin(){
   var chats=allAct.filter(function(a){return a.type==='chat'}).length;
   var searches=allAct.filter(function(a){return a.type==='search'||a.type==='tool'}).length;
 
-  var usersHtml=!users.length?'<div style="color:var(--m2);font-size:.8rem;padding:1rem;text-align:center">Koi user nahi abhi</div>':
+  var usersHtml=!users.length?'<div style="color:var(--m2);font-size:.8rem;padding:1rem;text-align:center">No users yet</div>':
     users.map(function(u){
       var uh=JSON.parse(localStorage.getItem('nxsh_'+u.e)||'[]');
       var chatsU=uh.filter(function(x){return x.type==='chat'}).length;
@@ -2192,7 +2226,7 @@ function _openSecretAdmin(){
       +'</div>';
     }).join('');
 
-  var visHtml=!vis.length?'<div style="color:var(--m2);font-size:.8rem;padding:.5rem 0">Koi visit nahi abhi</div>':
+  var visHtml=!vis.length?'<div style="color:var(--m2);font-size:.8rem;padding:.5rem 0">No visits yet</div>':
     vis.slice(0,20).map(function(v){
       return '<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;margin-bottom:.35rem">'
         +'<div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600;color:#eeeeff">'+v.n+'</div><div style="font-size:.63rem;color:var(--m2)">'+v.e+'</div></div>'
@@ -2220,7 +2254,7 @@ function _openSecretAdmin(){
     }).join('');
   }
 
-  var actHtml=!allAct.length?'<div style="color:var(--m2);font-size:.8rem;padding:.5rem 0">Koi activity nahi</div>':
+  var actHtml=!allAct.length?'<div style="color:var(--m2);font-size:.8rem;padding:.5rem 0">No activity yet</div>':
     allAct.slice(0,30).map(function(a){
       var isChat=a.type==='chat';
       return '<div style="padding:.6rem .85rem;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:9px;margin-bottom:.38rem">'
@@ -2332,11 +2366,11 @@ function _saveApiKey(){
   var msgEl = document.getElementById('_apiKeyMsg');
   key = key.trim();
   if(!key.startsWith('sk-ant-') && !key.startsWith('gsk_')){
-    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Key "sk-ant-" ya "gsk_" se shuru honi chahiye!';}
+    if(msgEl){msgEl.style.display='block';msgEl.style.color='#ff8a8a';msgEl.textContent='⚠️ Key must start with "sk-ant-" or "gsk_"!';}
     return;
   }
   setApiKey(key);
-  if(msgEl){msgEl.style.display='block';msgEl.style.color='#00ffb3';msgEl.textContent='✅ API Key save ho gayi! Ab chat kaam karega.';}
+  if(msgEl){msgEl.style.display='block';msgEl.style.color='#00ffb3';msgEl.textContent='✅ API Key saved! Chat is ready.';}
   if(document.getElementById('_apiKeyInput')) document.getElementById('_apiKeyInput').value='';
   toast('✅ API Key saved!');
 }
